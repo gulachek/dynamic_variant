@@ -5,8 +5,10 @@
 #include <variant>
 #include <functional>
 #include <any>
-#include <gulachek/gtree.hpp>
-#include <gulachek/gtree/encoding/variant.hpp>
+#include <tuple>
+#include <gulachek/gtree/encoding.hpp>
+#include <gulachek/gtree/decoding.hpp>
+#include <gulachek/gtree/encoding/unsigned.hpp>
 
 namespace gulachek
 {
@@ -73,9 +75,38 @@ namespace gulachek
 			int
 				>;
 
-		public:
-			using types = gulachek::gtree::meta_cons<Ts...>;
+		static constexpr std::size_t ntypes = sizeof...(Ts);
+		using tup_t = std::tuple<Ts...>;
 
+		template <typename T, std::size_t index>
+			requires (index == ntypes)
+		static constexpr std::size_t index_of_type_impl()
+		{
+			return ntypes;
+		}
+
+		template <typename T, std::size_t index>
+			requires (index < ntypes)
+		static constexpr std::size_t index_of_type_impl()
+		{
+			if constexpr (std::is_same_v<T,
+					typename std::tuple_element<index, tup_t>::type>)
+			{
+				return index;
+			}
+			else
+			{
+				return index_of_type_impl<T, index+1>();
+			}
+		}
+
+		template <typename T>
+		static constexpr std::size_t index_of_type()
+		{
+			return index_of_type_impl<T, 0>();
+		}
+
+		public:
 			dynamic_variant() : _i{0}, _val{} {}
 
 			template <
@@ -158,7 +189,7 @@ namespace gulachek
 			template <typename U>
 			std::add_pointer_t<const U> match() const
 			{
-				if (_i == gtree::index_of<types, U>())
+				if (_i == index_of_type<U>())
 					return std::any_cast<const U>(&_val);
 
 				return nullptr;
@@ -167,7 +198,7 @@ namespace gulachek
 			template <typename U>
 			std::add_pointer_t<U> match()
 			{
-				if (_i == gtree::index_of<types, U>())
+				if (_i == index_of_type<U>())
 					return std::any_cast<U>(&_val);
 
 				return nullptr;
@@ -189,9 +220,104 @@ namespace gulachek
 				return *pmatch;
 			}
 
+			cause gtree_decode(gtree::treeder &r)
+			{
+				std::size_t actual_index;
+				if (auto err = gtree::decode_unsigned(r.value(), &actual_index))
+				{
+					cause wrap{"error reading dynamic_variant alt index"};
+					wrap.add_cause(err);
+					return wrap;
+				}
+
+				if (!r.child_count())
+				{
+					return {"expected dynamic_variant encoding to have child"};
+				}
+
+				return decode_alt<0>(actual_index, r);
+			}
+
+			cause gtree_encode(gtree::tree_writer &w) const
+			{
+				std::uint8_t index[sizeof(std::size_t)];
+				auto nbytes = gtree::encode_unsigned(index, _i);
+				w.value(index, nbytes);
+
+				w.child_count(1);
+				return encode_alt<0>(w);
+			}
+
 		private:
 			std::size_t _i;
 			std::any _val;
+
+			template <std::size_t index>
+				requires (index == ntypes)
+			cause decode_alt(std::size_t actual_index, gtree::treeder &r)
+			{
+				cause err;
+				err << "dynamic_variant index " << actual_index << " is "
+					"too large for " << ntypes << " alts";
+				return err;
+			}
+
+			template <std::size_t index>
+				requires (index < ntypes)
+			cause decode_alt(std::size_t actual_index, gtree::treeder &r)
+			{
+				if (actual_index == index)
+				{
+					using alt_t =
+						typename std::tuple_element<index, tup_t>::type;
+
+					alt_t val;
+					if (auto err = r.read(&val))
+					{
+						cause wrap;
+						wrap << "error reading dynamic_variant alt " << index;
+						wrap.add_cause(err);
+						return wrap;
+					}
+
+					_i = index;
+					_val = std::move(val);
+					return {};
+				}
+
+				return decode_alt<index+1>(actual_index, r);
+			}
+
+			template <std::size_t index>
+				requires (index == ntypes)
+			cause encode_alt(gtree::tree_writer &w) const
+			{
+				throw std::logic_error{"encoding bad dynamic_variant"};
+			}
+
+			template <std::size_t index>
+				requires (index < ntypes)
+			cause encode_alt(gtree::tree_writer &w) const
+			{
+				if (_i == index)
+				{
+					using alt_t =
+						typename std::tuple_element<index, tup_t>::type;
+
+					const auto *pval = std::any_cast<alt_t>(&_val);
+					if (auto err = w.write(*pval))
+					{
+						cause wrap;
+						wrap << "failed to encode dynamic_variant alt " << _i;
+						wrap.add_cause(err);
+						return wrap;
+					}
+
+					return {};
+				}
+
+				return encode_alt<index+1>(w);
+			}
 	};
 }
 
@@ -298,24 +424,6 @@ namespace gulachek
 
 		return fs[var.index()]();
 	}
-}
-
-namespace gulachek::gtree
-{
-	template <typename ...Ts>
-	struct variant_encoding<gulachek::dynamic_variant<Ts...>>
-	{
-		using type = gulachek::dynamic_variant<Ts...>;
-		using types = gulachek::gtree::meta_cons<Ts...>;
-
-		template <typename Var>
-		static std::size_t index(Var &&var)
-		{ return var.index(); }
-
-		template <typename T, typename Var>
-		static auto get(Var &&var)
-		{ return std::get<T>(std::forward<Var>(var)); }
-	};
 }
 
 #endif

@@ -8,10 +8,14 @@ namespace bd = boost::unit_test::data;
 
 #include "gulachek/dynamic_variant.hpp"
 #include <variant>
+#include <sstream>
 #include <boost/fusion/adapted/struct/adapt_struct.hpp>
 #include <boost/fusion/include/adapt_struct.hpp>
+
 #include <gulachek/gtree.hpp>
-#include <gulachek/gtree/encoding/fusion.hpp>
+#include <gulachek/gtree/encoding/variant.hpp>
+#include <gulachek/gtree/encoding/string.hpp>
+#include <gulachek/gtree/encoding/signed.hpp>
 
 namespace gt = gulachek::gtree;
 
@@ -322,32 +326,6 @@ BOOST_AUTO_TEST_CASE(TwoElems)
 	BOOST_TEST(size(l) == 2);
 }
 
-BOOST_AUTO_TEST_CASE(EncodeList)
-{
-	using u = std::size_t;
-	linked_list<u> l = cons<u>{1, cons<u>{2, empty{}}};
-	gt::mutable_tree tr;
-
-	gt::encode(l, tr);
-
-	// We know this isn't empty
-	std::size_t index = 10;
-	gt::decode(tr, index);
-	BOOST_TEST(index == 1);
-
-	// let's decode again
-	linked_list<u> reconstruct;
-	gt::decode(tr, reconstruct);
-	BOOST_TEST(size(reconstruct) == 2);
-
-	auto first = std::get<cons<u>>(reconstruct);
-	auto second = std::get<cons<u>>(first.tail);
-	auto last = std::get<empty>(second.tail);
-
-	BOOST_TEST(first.head == 1);
-	BOOST_TEST(second.head == 2);
-}
-
 BOOST_AUTO_TEST_CASE(BadCastToEmpty)
 {
 	using u = std::size_t;
@@ -361,3 +339,39 @@ BOOST_AUTO_TEST_CASE(BadCastToEmpty)
 }
 
 BOOST_AUTO_TEST_SUITE_END() // LinkedListUseCase
+
+BOOST_AUTO_TEST_CASE(DecodeStrint)
+{
+	std::variant<std::string, int> s = 3;
+	dv<std::string, int> d;
+
+	std::stringstream ss;
+	gt::write(ss, s);
+	ss.seekg(0, std::ios::beg);
+	
+	auto err = gt::read(ss, &d);
+
+	BOOST_REQUIRE(!err);
+
+	auto pi = std::get_if<int>(&d);
+	BOOST_REQUIRE(pi);
+	BOOST_TEST(*pi == 3);
+}
+
+BOOST_AUTO_TEST_CASE(EncodeStrint)
+{
+	std::variant<std::string, int> s;
+	dv<std::string, int> d = 3;
+
+	std::stringstream ss;
+	gt::write(ss, d);
+	ss.seekg(0, std::ios::beg);
+	
+	auto err = gt::read(ss, &s);
+
+	BOOST_REQUIRE(!err);
+
+	auto pi = std::get_if<int>(&s);
+	BOOST_REQUIRE(pi);
+	BOOST_TEST(*pi == 3);
+}
