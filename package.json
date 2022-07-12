@@ -1,0 +1,26 @@
+{
+  "name": "dynamic_variant",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gulachek/dynamic_variant.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/gulachek/dynamic_variant/issues"
+  },
+  "homepage": "https://github.com/gulachek/dynamic_variant#readme",
+  "dependencies": {
+    "gulpachek": "github:gulachek/gulpachek"
+  }
+}
