@@ -1,4 +1,4 @@
-const { task } = require('gulp');
+const { task, series } = require('gulp');
 const { spawn } = require('child_process');
 
 const { BuildSystem, Target } = require('gulpachek');
@@ -52,6 +52,7 @@ class GtreeLib extends Target {
 
 class DynamicVariant extends Target {
 	#gtree;
+	#lib;
 
 	constructor(sys) {
 		super(sys);
@@ -67,14 +68,22 @@ class DynamicVariant extends Target {
 			'test/dynamic_variant_test.cpp'
 		);
 
-		const lib = cpp.library('com.gulachek.dynamic-variant', version);
-		lib.include('include');
-		lib.link(this.#gtree.lib());
+		this.#lib = cpp.library('com.gulachek.dynamic-variant', version);
+		this.#lib.include('include');
+		this.#lib.link(this.#gtree.lib());
 
-		test.link(lib);
+		test.link(this.#lib);
 		test.link(boost.test);
 		return this.sys().rule(test)(cb);
 	}
+
+	libroot() {
+		return this.#lib.libroot();
+	}
 }
 
-task('default', sys.rule(new DynamicVariant(sys)));
+const dv = new DynamicVariant(sys);
+task('default', sys.rule(dv));
+task('install', series('default', (cb) => {
+	return sys.rule(db.libroot())(cb);
+}));
