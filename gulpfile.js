@@ -1,5 +1,6 @@
 const { task, series } = require('gulp');
 const { spawn } = require('child_process');
+const path = require('path');
 
 const { BuildSystem, Target } = require('gulpachek');
 const { Cpp } = require('gulpachek/cpp');
@@ -34,7 +35,7 @@ class GtreeLib extends Target {
 				GULPACHEK_BUILD_DIR: sys.dest('gtree').abs(),
 				GULPACHEK_INSTALL_ROOT_INCLUDE: sys.dest('include').abs(),
 				GULPACHEK_INSTALL_ROOT_LIB: sys.dest('lib').abs(),
-				GULPACHEK_INSTALL_ROOT_CPPLIBROOT: librootPath,
+				GULPACHEK_INSTALL_ROOT_CPPLIBROOT: path.resolve(librootPath),
 		}});
 	}
 
@@ -85,5 +86,5 @@ class DynamicVariant extends Target {
 const dv = new DynamicVariant(sys);
 task('default', sys.rule(dv));
 task('install', series('default', (cb) => {
-	return sys.rule(db.libroot())(cb);
+	return sys.rule(dv.libroot())(cb);
 }));
