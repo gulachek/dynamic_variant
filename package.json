@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/gulachek/dynamic_variant#readme",
   "dependencies": {
+    "bach": "^2.0.1",
     "gulpachek": "github:gulachek/gulpachek"
   }
 }
