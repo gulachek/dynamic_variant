@@ -14,13 +14,13 @@ function makeLib(args) {
 
 	const dv = cpp.compile({
 		name: 'com.gulachek.dynamic-variant',
-		version: '0.1.0',
+		version: '0.2.0',
 		apiDef: 'GULACHEK_DYNAMIC_VARIANT_API'
 	});
 
 	dv.include('include');
 
-	const gtree = cpp.require('com.gulachek.gtree', '0.1.0');
+	const gtree = cpp.require('com.gulachek.gtree', '0.2.0');
 
 	dv.link(gtree);
 

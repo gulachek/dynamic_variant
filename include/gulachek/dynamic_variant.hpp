@@ -220,14 +220,12 @@ namespace gulachek
 				return *pmatch;
 			}
 
-			cause gtree_decode(gtree::treeder &r)
+			error gtree_decode(gtree::treeder &r)
 			{
 				std::size_t actual_index;
 				if (auto err = gtree::decode_unsigned(r.value(), &actual_index))
 				{
-					cause wrap{"error reading dynamic_variant alt index"};
-					wrap.add_cause(err);
-					return wrap;
+					return err.wrap() << "error reading dynamic_variant alt index"; 
 				}
 
 				if (!r.child_count())
@@ -238,7 +236,7 @@ namespace gulachek
 				return decode_alt<0>(actual_index, r);
 			}
 
-			cause gtree_encode(gtree::tree_writer &w) const
+			error gtree_encode(gtree::tree_writer &w) const
 			{
 				std::uint8_t index[sizeof(std::size_t)];
 				auto nbytes = gtree::encode_unsigned(index, _i);
@@ -254,9 +252,9 @@ namespace gulachek
 
 			template <std::size_t index>
 				requires (index == ntypes)
-			cause decode_alt(std::size_t actual_index, gtree::treeder &r)
+			error decode_alt(std::size_t actual_index, gtree::treeder &r)
 			{
-				cause err;
+				error err;
 				err << "dynamic_variant index " << actual_index << " is "
 					"too large for " << ntypes << " alts";
 				return err;
@@ -264,7 +262,7 @@ namespace gulachek
 
 			template <std::size_t index>
 				requires (index < ntypes)
-			cause decode_alt(std::size_t actual_index, gtree::treeder &r)
+			error decode_alt(std::size_t actual_index, gtree::treeder &r)
 			{
 				if (actual_index == index)
 				{
@@ -274,10 +272,7 @@ namespace gulachek
 					alt_t val;
 					if (auto err = r.read(&val))
 					{
-						cause wrap;
-						wrap << "error reading dynamic_variant alt " << index;
-						wrap.add_cause(err);
-						return wrap;
+						return err.wrap() << "error reading dynamic_variant alt " << index; 
 					}
 
 					_i = index;
@@ -290,14 +285,14 @@ namespace gulachek
 
 			template <std::size_t index>
 				requires (index == ntypes)
-			cause encode_alt(gtree::tree_writer &w) const
+			error encode_alt(gtree::tree_writer &w) const
 			{
 				throw std::logic_error{"encoding bad dynamic_variant"};
 			}
 
 			template <std::size_t index>
 				requires (index < ntypes)
-			cause encode_alt(gtree::tree_writer &w) const
+			error encode_alt(gtree::tree_writer &w) const
 			{
 				if (_i == index)
 				{
@@ -307,10 +302,7 @@ namespace gulachek
 					const auto *pval = std::any_cast<alt_t>(&_val);
 					if (auto err = w.write(*pval))
 					{
-						cause wrap;
-						wrap << "failed to encode dynamic_variant alt " << _i;
-						wrap.add_cause(err);
-						return wrap;
+						return err.wrap() << "failed to encode dynamic_variant alt " << _i;
 					}
 
 					return {};
